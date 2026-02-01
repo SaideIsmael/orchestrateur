@@ -15,10 +15,31 @@ const shutdown = () => {
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
-const vite = execa('vite', ['--config', 'vite.config.ts'], { stdio: 'inherit' });
-const tsc = execa('tsc', ['-p', 'tsconfig.main.json', '-w', '--preserveWatchOutput'], {
+const rootDir = process.cwd();
+const nodeBin = process.execPath;
+const viteBin = path.join(rootDir, 'node_modules', 'vite', 'bin', 'vite.js');
+const tscBin = path.join(
+  rootDir,
+  'node_modules',
+  'typescript',
+  'bin',
+  'tsc'
+);
+const electronBin = path.join(
+  rootDir,
+  'node_modules',
+  'electron',
+  'cli.js'
+);
+
+const vite = execa(nodeBin, [viteBin, '--config', 'vite.config.ts'], {
   stdio: 'inherit'
 });
+const tsc = execa(
+  nodeBin,
+  [tscBin, '-p', 'tsconfig.main.json', '-w', '--preserveWatchOutput'],
+  { stdio: 'inherit' }
+);
 
 childProcesses.push(vite, tsc);
 
@@ -33,14 +54,14 @@ const waitForFile = async (filePath, timeoutMs) => {
   return false;
 };
 
-const mainOutDir = path.join(process.cwd(), 'dist', 'main');
+const mainOutDir = path.join(rootDir, 'dist', 'main');
 const mainEntry = path.join(mainOutDir, 'main.js');
 const preloadEntry = path.join(mainOutDir, 'preload.js');
 
 await waitForFile(mainEntry, 30000);
 await waitForFile(preloadEntry, 30000);
 
-const electron = execa('electron', ['.'], {
+const electron = execa(nodeBin, [electronBin, '.'], {
   stdio: 'inherit',
   env: {
     ...process.env,
