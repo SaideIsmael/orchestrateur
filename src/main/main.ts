@@ -27,6 +27,8 @@ function createMainWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
+      webviewTag: false,
+      safeDialogs: true,
       enableRemoteModule: false
     } as Electron.WebPreferences
   });

@@ -65,6 +65,8 @@ export class BrowserViewManager {
         nodeIntegration: false,
         contextIsolation: true,
         sandbox: true,
+        webviewTag: false,
+        safeDialogs: true,
         enableRemoteModule: false
       } as Electron.WebPreferences
     });
@@ -75,6 +77,15 @@ export class BrowserViewManager {
 
     const userAgent = provider.userAgentOverride || this.fallbackUserAgent;
     this.view.webContents.setUserAgent(userAgent);
+    this.view.webContents.setWindowOpenHandler(({ url }) => {
+      if (!this.isUrlAllowed(url)) {
+        this.notify('Navigation bloquee (hors liste blanche).');
+        return { action: 'deny' };
+      }
+
+      this.view?.webContents.loadURL(url);
+      return { action: 'deny' };
+    });
 
     this.activeProviderId = provider.id;
     this.allowlist = [...provider.allowlist];
