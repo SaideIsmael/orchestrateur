@@ -61,11 +61,33 @@ const preloadEntry = path.join(mainOutDir, 'preload.js');
 await waitForFile(mainEntry, 30000);
 await waitForFile(preloadEntry, 30000);
 
+const waitForUrl = async (url, timeoutMs) => {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 1500);
+      const response = await fetch(url, { signal: controller.signal });
+      clearTimeout(timer);
+      if (response.ok) {
+        return true;
+      }
+    } catch {
+      // ignore until timeout
+    }
+    await new Promise((resolve) => setTimeout(resolve, 300));
+  }
+  return false;
+};
+
+const devUrl = process.env.VITE_DEV_SERVER_URL ?? 'http://localhost:5173';
+await waitForUrl(devUrl, 30000);
+
 const electron = execa(nodeBin, [electronBin, '.'], {
   stdio: 'inherit',
   env: {
     ...process.env,
-    VITE_DEV_SERVER_URL: 'http://localhost:5173'
+    VITE_DEV_SERVER_URL: devUrl
   }
 });
 
