@@ -1,9 +1,17 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'node:path';
+import { BrowserViewManager } from './browserViewManager';
 import { getProvidersConfigPath, loadProvidersConfig } from './providersStore';
 import { loadState } from './stateStore';
+import type { ProviderDefinition } from '../shared/providers';
 
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
+const FALLBACK_USER_AGENT =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+
+let providersCache: ProviderDefinition[] = [];
+let viewManager: BrowserViewManager | null = null;
+let configErrors: string[] | null = null;
 
 function createMainWindow() {
   const mainWindow = new BrowserWindow({
@@ -67,6 +75,7 @@ app.whenReady().then(() => {
   loadState();
 
   if (!providersResult.ok) {
+    configErrors = providersResult.errors;
     const html = renderConfigErrorHtml(
       providersResult.errors,
       getProvidersConfigPath()
@@ -74,14 +83,57 @@ app.whenReady().then(() => {
     mainWindow.loadURL(
       `data:text/html;charset=UTF-8,${encodeURIComponent(html)}`
     );
-  } else {
-    loadRenderer(mainWindow);
+    return;
   }
+
+  configErrors = null;
+  providersCache = providersResult.providers;
+  viewManager = new BrowserViewManager(mainWindow, FALLBACK_USER_AGENT);
+
+  ipcMain.handle('providers:list', () =>
+    providersCache.map(({ id, name, url_home }) => ({
+      id,
+      name,
+      url_home
+    }))
+  );
+
+  ipcMain.handle('provider:open', (_event, providerId: string) => {
+    const provider = providersCache.find((item) => item.id === providerId);
+    if (!provider || !viewManager) {
+      return { ok: false, error: 'Provider introuvable.' } as const;
+    }
+
+    viewManager.openProvider(provider);
+    return { ok: true } as const;
+  });
+
+  ipcMain.on('view:setBounds', (_event, bounds) => {
+    viewManager?.setBounds(bounds);
+  });
+
+  ipcMain.handle('nav:back', () => viewManager?.navigateBack());
+  ipcMain.handle('nav:forward', () => viewManager?.navigateForward());
+  ipcMain.handle('nav:reload', () => viewManager?.reload());
+  ipcMain.handle('nav:state', () => viewManager?.getNavState());
+
+  loadRenderer(mainWindow);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       const nextWindow = createMainWindow();
-      loadRenderer(nextWindow);
+      if (configErrors) {
+        const html = renderConfigErrorHtml(
+          configErrors,
+          getProvidersConfigPath()
+        );
+        nextWindow.loadURL(
+          `data:text/html;charset=UTF-8,${encodeURIComponent(html)}`
+        );
+      } else {
+        viewManager = new BrowserViewManager(nextWindow, FALLBACK_USER_AGENT);
+        loadRenderer(nextWindow);
+      }
     }
   });
 });
