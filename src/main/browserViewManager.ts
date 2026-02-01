@@ -1,5 +1,6 @@
 import { BrowserView, BrowserWindow, session } from 'electron';
 import type { ProviderDefinition } from '../shared/providers';
+import { allowNavigation } from '../shared/allowlist';
 
 export type BrowserBounds = {
   x: number;
@@ -23,6 +24,8 @@ export class BrowserViewManager {
   private view: BrowserView | null = null;
   private bounds: BrowserBounds = { x: 0, y: 0, width: 800, height: 600 };
   private activeProviderId: string | null = null;
+  private allowlist: string[] = [];
+  private permissiveMode = false;
   private configuredSessions = new Set<string>();
   private readonly fallbackUserAgent: string;
 
@@ -74,6 +77,7 @@ export class BrowserViewManager {
     this.view.webContents.setUserAgent(userAgent);
 
     this.activeProviderId = provider.id;
+    this.allowlist = [...provider.allowlist];
     this.attachNavigationEvents();
     this.view.webContents.loadURL(provider.url_home);
 
@@ -107,6 +111,14 @@ export class BrowserViewManager {
     };
   }
 
+  setPermissiveMode(enabled: boolean) {
+    this.permissiveMode = enabled;
+  }
+
+  getPermissiveMode() {
+    return this.permissiveMode;
+  }
+
   private attachNavigationEvents() {
     if (!this.view) {
       return;
@@ -120,11 +132,43 @@ export class BrowserViewManager {
     contents.on('did-start-navigation', update);
     contents.on('page-title-updated', update);
     contents.on('did-stop-loading', update);
+
+    contents.on('will-navigate', (event, url) => {
+      if (!this.isUrlAllowed(url)) {
+        event.preventDefault();
+        this.notify('Navigation bloquee (hors liste blanche).');
+      }
+    });
+
+    contents.on('will-redirect', (event, url, _isInPlace, isMainFrame) => {
+      if (isMainFrame && !this.isUrlAllowed(url)) {
+        event.preventDefault();
+        this.notify('Navigation bloquee (hors liste blanche).');
+      }
+    });
   }
 
   private emitNavState() {
     const state = this.getNavState();
     this.window.webContents.send('nav:state', state);
+  }
+
+  private isUrlAllowed(url: string) {
+    if (this.permissiveMode) {
+      if (!allowNavigation(url, this.allowlist)) {
+        this.notify('Navigation hors liste blanche (mode permissif).');
+      }
+      return true;
+    }
+
+    return allowNavigation(url, this.allowlist);
+  }
+
+  private notify(message: string) {
+    this.window.webContents.send('ui:notification', {
+      level: 'warning',
+      message
+    });
   }
 
   private applySessionHeaders(partitionId: string, providerSession: Electron.Session) {

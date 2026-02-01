@@ -17,6 +17,8 @@ declare global {
       navigateBack: () => Promise<void>;
       navigateForward: () => Promise<void>;
       reload: () => Promise<void>;
+      getPermissiveMode: () => Promise<boolean | undefined>;
+      setPermissiveMode: (enabled: boolean) => Promise<boolean | undefined>;
       getNavState: () => Promise<{
         canGoBack: boolean;
         canGoForward: boolean;
@@ -32,6 +34,9 @@ declare global {
           title: string;
           providerId: string | null;
         }) => void
+      ) => () => void;
+      onNotification: (
+        callback: (payload: { level: 'warning' | 'info'; message: string }) => void
       ) => () => void;
     };
   }

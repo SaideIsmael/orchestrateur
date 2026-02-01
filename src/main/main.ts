@@ -116,6 +116,13 @@ app.whenReady().then(() => {
   ipcMain.handle('nav:forward', () => viewManager?.navigateForward());
   ipcMain.handle('nav:reload', () => viewManager?.reload());
   ipcMain.handle('nav:state', () => viewManager?.getNavState());
+  ipcMain.handle('settings:getPermissive', () =>
+    viewManager?.getPermissiveMode()
+  );
+  ipcMain.handle('settings:setPermissive', (_event, enabled: boolean) => {
+    viewManager?.setPermissiveMode(Boolean(enabled));
+    return viewManager?.getPermissiveMode();
+  });
 
   loadRenderer(mainWindow);
 

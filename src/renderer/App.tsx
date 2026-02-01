@@ -18,7 +18,11 @@ export default function App() {
     title: '',
     providerId: null
   });
+  const [permissiveMode, setPermissiveMode] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [notifications, setNotifications] = useState<
+    { id: number; message: string; level: 'warning' | 'info' }[]
+  >([]);
   const browserRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -35,13 +39,35 @@ export default function App() {
       }
     });
 
+    window.orchestrator.getPermissiveMode().then((value) => {
+      if (typeof value === 'boolean') {
+        setPermissiveMode(value);
+      }
+    });
+
     const unsubscribe = window.orchestrator.onNavState((state) => {
       setNavState(state);
     });
 
+    const unsubscribeNotifications = window.orchestrator.onNotification(
+      (payload) => {
+        const id = Date.now();
+        setNotifications((current) => [
+          ...current,
+          { id, message: payload.message, level: payload.level }
+        ]);
+        window.setTimeout(() => {
+          setNotifications((current) =>
+            current.filter((item) => item.id !== id)
+          );
+        }, 4000);
+      }
+    );
+
     return () => {
       mounted = false;
       unsubscribe();
+      unsubscribeNotifications();
     };
   }, []);
 
@@ -79,6 +105,13 @@ export default function App() {
       setErrorMessage(result.error);
     } else {
       setErrorMessage(null);
+    }
+  };
+
+  const handlePermissiveToggle = async (enabled: boolean) => {
+    const value = await window.orchestrator.setPermissiveMode(enabled);
+    if (typeof value === 'boolean') {
+      setPermissiveMode(value);
     }
   };
 
@@ -122,10 +155,27 @@ export default function App() {
             </button>
           ))}
         </div>
+        <label className="permissive-toggle">
+          <input
+            type="checkbox"
+            checked={permissiveMode}
+            onChange={(event) => handlePermissiveToggle(event.target.checked)}
+          />
+          Mode permissif
+        </label>
         <div className="nav-url" title={navState.url}>
           {navState.url || 'Aucun site charge'}
         </div>
       </div>
+      {notifications.length > 0 ? (
+        <div className="toast-stack">
+          {notifications.map((note) => (
+            <div key={note.id} className={`toast ${note.level}`}>
+              {note.message}
+            </div>
+          ))}
+        </div>
+      ) : null}
       {errorMessage ? <div className="error-banner">{errorMessage}</div> : null}
       <main className="main">
         <section className="browser-shell">

@@ -11,11 +11,21 @@ contextBridge.exposeInMainWorld('orchestrator', {
   navigateForward: () => ipcRenderer.invoke('nav:forward'),
   reload: () => ipcRenderer.invoke('nav:reload'),
   getNavState: () => ipcRenderer.invoke('nav:state'),
+  getPermissiveMode: () => ipcRenderer.invoke('settings:getPermissive'),
+  setPermissiveMode: (enabled: boolean) =>
+    ipcRenderer.invoke('settings:setPermissive', enabled),
   onNavState: (callback: (state: { canGoBack: boolean; canGoForward: boolean; url: string; title: string; providerId: string | null }) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, state: { canGoBack: boolean; canGoForward: boolean; url: string; title: string; providerId: string | null }) => {
       callback(state);
     };
     ipcRenderer.on('nav:state', listener);
     return () => ipcRenderer.removeListener('nav:state', listener);
+  },
+  onNotification: (callback: (payload: { level: 'warning' | 'info'; message: string }) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, payload: { level: 'warning' | 'info'; message: string }) => {
+      callback(payload);
+    };
+    ipcRenderer.on('ui:notification', listener);
+    return () => ipcRenderer.removeListener('ui:notification', listener);
   }
 });
