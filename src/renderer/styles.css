@@ -194,6 +194,32 @@ textarea {
   font-family: inherit;
 }
 
+select {
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.provider-switch {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.provider-switch-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.provider-switch-row button {
+  padding: 8px 14px;
+  font-size: 12px;
+}
+
 .actions {
   display: flex;
   justify-content: flex-start;

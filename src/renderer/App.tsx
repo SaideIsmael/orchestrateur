@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 type ProviderSummary = { id: string; name: string; url_home: string };
 type NavState = {
@@ -23,7 +23,25 @@ export default function App() {
   const [notifications, setNotifications] = useState<
     { id: number; message: string; level: 'warning' | 'info' }[]
   >([]);
+  const [question, setQuestion] = useState('');
+  const [responseText, setResponseText] = useState('');
+  const [openedProviders] = useState<ProviderSummary[]>([]);
+  const [selectedOpenedProvider, setSelectedOpenedProvider] = useState('');
   const browserRef = useRef<HTMLDivElement | null>(null);
+
+  const pushNotification = useCallback(
+    (message: string, level: 'warning' | 'info') => {
+      const id = Date.now();
+      setNotifications((current) => [
+        ...current,
+        { id, message, level }
+      ]);
+      window.setTimeout(() => {
+        setNotifications((current) => current.filter((item) => item.id !== id));
+      }, 4000);
+    },
+    []
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -51,16 +69,7 @@ export default function App() {
 
     const unsubscribeNotifications = window.orchestrator.onNotification(
       (payload) => {
-        const id = Date.now();
-        setNotifications((current) => [
-          ...current,
-          { id, message: payload.message, level: payload.level }
-        ]);
-        window.setTimeout(() => {
-          setNotifications((current) =>
-            current.filter((item) => item.id !== id)
-          );
-        }, 4000);
+        pushNotification(payload.message, payload.level);
       }
     );
 
@@ -69,7 +78,7 @@ export default function App() {
       unsubscribe();
       unsubscribeNotifications();
     };
-  }, []);
+  }, [pushNotification]);
 
   useEffect(() => {
     if (!browserRef.current) {
@@ -112,6 +121,20 @@ export default function App() {
     const value = await window.orchestrator.setPermissiveMode(enabled);
     if (typeof value === 'boolean') {
       setPermissiveMode(value);
+    }
+  };
+
+  const handleCopyPrompt = async () => {
+    if (!question.trim()) {
+      pushNotification('Le champ question est vide.', 'warning');
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(question);
+      pushNotification('Prompt copie dans le presse-papiers.', 'info');
+    } catch {
+      pushNotification('Impossible de copier le prompt.', 'warning');
     }
   };
 
@@ -185,14 +208,47 @@ export default function App() {
           <h2>Orchestrateur</h2>
           <div className="field">
             <label>Question</label>
-            <textarea placeholder="Saisir la question..." rows={6} />
+            <textarea
+              placeholder="Saisir la question..."
+              rows={6}
+              value={question}
+              onChange={(event) => setQuestion(event.target.value)}
+            />
+            <div className="provider-switch">
+              <label>Opened Providers</label>
+              <div className="provider-switch-row">
+                <select
+                  value={selectedOpenedProvider}
+                  onChange={(event) =>
+                    setSelectedOpenedProvider(event.target.value)
+                  }
+                >
+                  <option value="">Aucun provider ouvert</option>
+                  {openedProviders.map((provider) => (
+                    <option key={provider.id} value={provider.id}>
+                      {provider.name}
+                    </option>
+                  ))}
+                </select>
+                <button type="button" disabled={!selectedOpenedProvider}>
+                  Ouvrir / Basculer
+                </button>
+              </div>
+            </div>
           </div>
           <div className="actions">
-            <button type="button">Copier prompt</button>
+            <button type="button" onClick={handleCopyPrompt}>
+              Copier prompt
+            </button>
           </div>
           <div className="field">
             <label>Reponse collee</label>
-            <textarea placeholder="Coller la reponse ici..." rows={8} />
+            <textarea
+              placeholder="Coller la reponse ici..."
+              rows={8}
+              value={responseText}
+              onChange={(event) => setResponseText(event.target.value)}
+            />
           </div>
         </aside>
       </main>
