@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "jsx": "react-jsx",
+    "types": ["node", "vite/client"]
+  },
+  "include": [
+    "src/main/**/*",
+    "src/renderer/**/*",
+    "src/shared/**/*",
+    "tests/**/*"
+  ]
+}

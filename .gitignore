@@ -1,0 +1,42 @@
+# Ignore everything by default (repo lives at user root)
+*
+
+# Keep git metadata
+!.gitignore
+
+# Project files
+!package.json
+!package-lock.json
+!eslint.config.mjs
+!vite.config.ts
+!vitest.config.mjs
+!tsconfig*.json
+!index.html
+!README.md
+
+# Project directories
+!src/
+!src/main/
+!src/main/**
+!src/renderer/
+!src/renderer/**
+!src/shared/
+!src/shared/**
+!tests/
+!tests/**
+!scripts/
+!scripts/**
+!config/
+!config/**
+!assets/
+!assets/**
+
+# Build output and deps
+node_modules/
+dist/
+out/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
