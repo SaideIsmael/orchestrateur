@@ -1,0 +1,32 @@
+[
+  {
+    "id": "chatgpt",
+    "name": "ChatGPT",
+    "url_home": "https://chatgpt.com/",
+    "allowlist": ["chatgpt.com", "chat.openai.com", "openai.com"]
+  },
+  {
+    "id": "claude",
+    "name": "Claude",
+    "url_home": "https://claude.ai/",
+    "allowlist": ["claude.ai"]
+  },
+  {
+    "id": "gemini",
+    "name": "Gemini",
+    "url_home": "https://gemini.google.com/",
+    "allowlist": ["gemini.google.com", "accounts.google.com"]
+  },
+  {
+    "id": "perplexity",
+    "name": "Perplexity",
+    "url_home": "https://www.perplexity.ai/",
+    "allowlist": ["perplexity.ai"]
+  },
+  {
+    "id": "deepseek",
+    "name": "DeepSeek",
+    "url_home": "https://chat.deepseek.com/",
+    "allowlist": ["chat.deepseek.com", "deepseek.com"]
+  }
+]
