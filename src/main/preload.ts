@@ -3,6 +3,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 contextBridge.exposeInMainWorld('orchestrator', {
   ping: () => ipcRenderer.invoke('app:ping'),
   getProviders: () => ipcRenderer.invoke('providers:list'),
+  getOpenedProviders: () => ipcRenderer.invoke('providers:opened'),
   openProvider: (providerId: string) =>
     ipcRenderer.invoke('provider:open', providerId),
   setBrowserBounds: (bounds: { x: number; y: number; width: number; height: number }) =>
@@ -27,5 +28,17 @@ contextBridge.exposeInMainWorld('orchestrator', {
     };
     ipcRenderer.on('ui:notification', listener);
     return () => ipcRenderer.removeListener('ui:notification', listener);
+  },
+  onOpenedProviders: (
+    callback: (providers: { id: string; name: string; url_home: string }[]) => void
+  ) => {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      providers: { id: string; name: string; url_home: string }[]
+    ) => {
+      callback(providers);
+    };
+    ipcRenderer.on('providers:opened', listener);
+    return () => ipcRenderer.removeListener('providers:opened', listener);
   }
 });

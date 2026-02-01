@@ -25,7 +25,7 @@ export default function App() {
   >([]);
   const [question, setQuestion] = useState('');
   const [responseText, setResponseText] = useState('');
-  const [openedProviders] = useState<ProviderSummary[]>([]);
+  const [openedProviders, setOpenedProviders] = useState<ProviderSummary[]>([]);
   const [selectedOpenedProvider, setSelectedOpenedProvider] = useState('');
   const browserRef = useRef<HTMLDivElement | null>(null);
 
@@ -57,6 +57,10 @@ export default function App() {
       }
     });
 
+    window.orchestrator.getOpenedProviders().then((items) => {
+      setOpenedProviders(items);
+    });
+
     window.orchestrator.getPermissiveMode().then((value) => {
       if (typeof value === 'boolean') {
         setPermissiveMode(value);
@@ -67,6 +71,12 @@ export default function App() {
       setNavState(state);
     });
 
+    const unsubscribeOpenedProviders = window.orchestrator.onOpenedProviders(
+      (items) => {
+        setOpenedProviders(items);
+      }
+    );
+
     const unsubscribeNotifications = window.orchestrator.onNotification(
       (payload) => {
         pushNotification(payload.message, payload.level);
@@ -76,9 +86,16 @@ export default function App() {
     return () => {
       mounted = false;
       unsubscribe();
+      unsubscribeOpenedProviders();
       unsubscribeNotifications();
     };
   }, [pushNotification]);
+
+  useEffect(() => {
+    if (navState.providerId) {
+      setSelectedOpenedProvider(navState.providerId);
+    }
+  }, [navState.providerId]);
 
   useEffect(() => {
     if (!browserRef.current) {
@@ -114,6 +131,7 @@ export default function App() {
       setErrorMessage(result.error);
     } else {
       setErrorMessage(null);
+      setSelectedOpenedProvider(providerId);
     }
   };
 
@@ -135,6 +153,13 @@ export default function App() {
       pushNotification('Prompt copie dans le presse-papiers.', 'info');
     } catch {
       pushNotification('Impossible de copier le prompt.', 'warning');
+    }
+  };
+
+  const handleOpenedProviderChange = async (providerId: string) => {
+    setSelectedOpenedProvider(providerId);
+    if (providerId) {
+      await handleOpenProvider(providerId);
     }
   };
 
@@ -220,7 +245,7 @@ export default function App() {
                 <select
                   value={selectedOpenedProvider}
                   onChange={(event) =>
-                    setSelectedOpenedProvider(event.target.value)
+                    handleOpenedProviderChange(event.target.value)
                   }
                 >
                   <option value="">Aucun provider ouvert</option>
@@ -230,7 +255,15 @@ export default function App() {
                     </option>
                   ))}
                 </select>
-                <button type="button" disabled={!selectedOpenedProvider}>
+                <button
+                  type="button"
+                  disabled={!selectedOpenedProvider}
+                  onClick={() =>
+                    selectedOpenedProvider
+                      ? handleOpenProvider(selectedOpenedProvider)
+                      : undefined
+                  }
+                >
                   Ouvrir / Basculer
                 </button>
               </div>

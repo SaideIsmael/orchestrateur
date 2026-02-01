@@ -7,6 +7,9 @@ declare global {
       getProviders: () => Promise<
         { id: string; name: string; url_home: string }[]
       >;
+      getOpenedProviders: () => Promise<
+        { id: string; name: string; url_home: string }[]
+      >;
       openProvider: (providerId: string) => Promise<{ ok: true } | { ok: false; error: string }>;
       setBrowserBounds: (bounds: {
         x: number;
@@ -37,6 +40,9 @@ declare global {
       ) => () => void;
       onNotification: (
         callback: (payload: { level: 'warning' | 'info'; message: string }) => void
+      ) => () => void;
+      onOpenedProviders: (
+        callback: (providers: { id: string; name: string; url_home: string }[]) => void
       ) => () => void;
     };
   }

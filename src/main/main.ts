@@ -2,8 +2,9 @@ import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'node:path';
 import { BrowserViewManager } from './browserViewManager';
 import { getProvidersConfigPath, loadProvidersConfig } from './providersStore';
-import { loadState } from './stateStore';
+import { loadState, saveState } from './stateStore';
 import type { ProviderDefinition } from '../shared/providers';
+import { addOpenedProvider, defaultState, setLastActiveProvider } from '../shared/state';
 
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
 const FALLBACK_USER_AGENT =
@@ -12,6 +13,7 @@ const FALLBACK_USER_AGENT =
 let providersCache: ProviderDefinition[] = [];
 let viewManager: BrowserViewManager | null = null;
 let configErrors: string[] | null = null;
+let orchestratorState = { ...defaultState };
 
 function createMainWindow() {
   const mainWindow = new BrowserWindow({
@@ -72,7 +74,7 @@ app.whenReady().then(() => {
   ipcMain.handle('app:ping', () => 'pong');
   const mainWindow = createMainWindow();
   const providersResult = loadProvidersConfig();
-  loadState();
+  orchestratorState = loadState();
 
   if (!providersResult.ok) {
     configErrors = providersResult.errors;
@@ -90,6 +92,16 @@ app.whenReady().then(() => {
   providersCache = providersResult.providers;
   viewManager = new BrowserViewManager(mainWindow, FALLBACK_USER_AGENT);
 
+  const getOpenedProviders = () =>
+    orchestratorState.openedProviders
+      .map((id) => providersCache.find((provider) => provider.id === id))
+      .filter((provider): provider is ProviderDefinition => Boolean(provider))
+      .map(({ id, name, url_home }) => ({ id, name, url_home }));
+
+  const broadcastOpenedProviders = () => {
+    mainWindow.webContents.send('providers:opened', getOpenedProviders());
+  };
+
   ipcMain.handle('providers:list', () =>
     providersCache.map(({ id, name, url_home }) => ({
       id,
@@ -98,6 +110,8 @@ app.whenReady().then(() => {
     }))
   );
 
+  ipcMain.handle('providers:opened', () => getOpenedProviders());
+
   ipcMain.handle('provider:open', (_event, providerId: string) => {
     const provider = providersCache.find((item) => item.id === providerId);
     if (!provider || !viewManager) {
@@ -105,6 +119,10 @@ app.whenReady().then(() => {
     }
 
     viewManager.openProvider(provider);
+    orchestratorState = addOpenedProvider(orchestratorState, provider.id);
+    orchestratorState = setLastActiveProvider(orchestratorState, provider.id);
+    saveState(orchestratorState);
+    broadcastOpenedProviders();
     return { ok: true } as const;
   });
 
@@ -125,6 +143,10 @@ app.whenReady().then(() => {
   });
 
   loadRenderer(mainWindow);
+
+  mainWindow.webContents.on('did-finish-load', () => {
+    broadcastOpenedProviders();
+  });
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
