@@ -1,4 +1,6 @@
 import { execa } from 'execa';
+import fs from 'node:fs';
+import path from 'node:path';
 
 const childProcesses = [];
 
@@ -20,7 +22,23 @@ const tsc = execa('tsc', ['-p', 'tsconfig.main.json', '-w', '--preserveWatchOutp
 
 childProcesses.push(vite, tsc);
 
-await new Promise((resolve) => setTimeout(resolve, 2000));
+const waitForFile = async (filePath, timeoutMs) => {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (fs.existsSync(filePath)) {
+      return true;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  return false;
+};
+
+const mainOutDir = path.join(process.cwd(), 'dist', 'main');
+const mainEntry = path.join(mainOutDir, 'main.js');
+const preloadEntry = path.join(mainOutDir, 'preload.js');
+
+await waitForFile(mainEntry, 30000);
+await waitForFile(preloadEntry, 30000);
 
 const electron = execa('electron', ['.'], {
   stdio: 'inherit',

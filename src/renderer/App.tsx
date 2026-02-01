@@ -10,6 +10,7 @@ type NavState = {
 };
 
 export default function App() {
+  const bridgeAvailable = Boolean(window.orchestrator);
   const [providers, setProviders] = useState<ProviderSummary[]>([]);
   const [navState, setNavState] = useState<NavState>({
     canGoBack: false,
@@ -20,6 +21,7 @@ export default function App() {
   });
   const [permissiveMode, setPermissiveMode] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [bridgeError, setBridgeError] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<
     { id: number; message: string; level: 'warning' | 'info' }[]
   >([]);
@@ -44,6 +46,11 @@ export default function App() {
   );
 
   useEffect(() => {
+    if (!bridgeAvailable) {
+      setBridgeError("Le preload n'a pas ete charge. Verifiez la compilation du main.");
+      return;
+    }
+
     let mounted = true;
     window.orchestrator.getProviders().then((list) => {
       if (mounted) {
@@ -89,7 +96,7 @@ export default function App() {
       unsubscribeOpenedProviders();
       unsubscribeNotifications();
     };
-  }, [pushNotification]);
+  }, [bridgeAvailable, pushNotification]);
 
   useEffect(() => {
     if (navState.providerId) {
@@ -98,7 +105,7 @@ export default function App() {
   }, [navState.providerId]);
 
   useEffect(() => {
-    if (!browserRef.current) {
+    if (!bridgeAvailable || !browserRef.current) {
       return;
     }
 
@@ -123,9 +130,14 @@ export default function App() {
       observer.disconnect();
       window.removeEventListener('resize', updateBounds);
     };
-  }, []);
+  }, [bridgeAvailable]);
 
   const handleOpenProvider = async (providerId: string) => {
+    if (!bridgeAvailable) {
+      setBridgeError("Bridge indisponible. Relancez l'application.");
+      return;
+    }
+
     const result = await window.orchestrator.openProvider(providerId);
     if ('ok' in result && !result.ok) {
       setErrorMessage(result.error);
@@ -136,6 +148,11 @@ export default function App() {
   };
 
   const handlePermissiveToggle = async (enabled: boolean) => {
+    if (!bridgeAvailable) {
+      setBridgeError("Bridge indisponible. Relancez l'application.");
+      return;
+    }
+
     const value = await window.orchestrator.setPermissiveMode(enabled);
     if (typeof value === 'boolean') {
       setPermissiveMode(value);
@@ -167,7 +184,9 @@ export default function App() {
     <div className="app">
       <header className="topbar">
         <div className="brand">Orchestrateur</div>
-        <div className="status">Session unique</div>
+        <div className="status">
+          {bridgeAvailable ? 'Session unique' : 'Bridge indisponible'}
+        </div>
       </header>
       <div className="nav-bar">
         <div className="nav-controls">
@@ -223,6 +242,9 @@ export default function App() {
             </div>
           ))}
         </div>
+      ) : null}
+      {bridgeError ? (
+        <div className="error-banner">{bridgeError}</div>
       ) : null}
       {errorMessage ? <div className="error-banner">{errorMessage}</div> : null}
       <main className="main">

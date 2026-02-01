@@ -6,7 +6,8 @@ import { loadState, saveState } from './stateStore';
 import type { ProviderDefinition } from '../shared/providers';
 import { addOpenedProvider, defaultState, setLastActiveProvider } from '../shared/state';
 
-const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
+const DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
+const isDev = !app.isPackaged && Boolean(DEV_SERVER_URL);
 const FALLBACK_USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
@@ -37,9 +38,11 @@ function createMainWindow() {
 }
 
 function loadRenderer(mainWindow: BrowserWindow) {
-  if (isDev && process.env.VITE_DEV_SERVER_URL) {
-    mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
-    mainWindow.webContents.openDevTools({ mode: 'detach' });
+  if (isDev && DEV_SERVER_URL) {
+    mainWindow.loadURL(DEV_SERVER_URL);
+    if (process.env.ORCH_DEVTOOLS === '1') {
+      mainWindow.webContents.openDevTools({ mode: 'detach' });
+    }
   } else {
     mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
   }
@@ -77,6 +80,32 @@ app.whenReady().then(() => {
   const mainWindow = createMainWindow();
   const providersResult = loadProvidersConfig();
   orchestratorState = loadState();
+
+  mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDesc, url) => {
+    const html = `<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chargement impossible</title>
+    <style>
+      body { font-family: "Segoe UI", sans-serif; background: #0f172a; color: #e2e8f0; padding: 32px; }
+      .card { max-width: 720px; background: #1e293b; border-radius: 16px; padding: 24px; }
+      h1 { margin-top: 0; font-size: 22px; }
+      code { background: #0f172a; padding: 2px 6px; border-radius: 6px; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>Impossible de charger l'interface</h1>
+      <p>Erreur: <strong>${errorDesc}</strong> (code ${errorCode}).</p>
+      <p>URL: <code>${url}</code></p>
+      <p>Si vous etes en dev, assurez-vous que Vite tourne sur ${DEV_SERVER_URL ?? 'http://localhost:5173'}.</p>
+    </div>
+  </body>
+</html>`;
+    mainWindow.loadURL(`data:text/html;charset=UTF-8,${encodeURIComponent(html)}`);
+  });
 
   if (!providersResult.ok) {
     configErrors = providersResult.errors;
