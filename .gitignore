@@ -13,6 +13,7 @@
 !tsconfig*.json
 !index.html
 !README.md
+!RUNBOOK.md
 
 # Project directories
 !src/

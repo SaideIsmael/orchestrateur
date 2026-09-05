@@ -55,9 +55,6 @@ function loadRenderer(mainWindow: BrowserWindow) {
         logger.main.error('Failed to load dev server:', error);
       });
     }
-    if (process.env.ORCH_DEVTOOLS === '1') {
-      mainWindow.webContents.openDevTools({ mode: 'detach' });
-    }
   } else {
     const loadResult = mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
     if (loadResult && typeof loadResult.catch === 'function') {
@@ -65,6 +62,12 @@ function loadRenderer(mainWindow: BrowserWindow) {
         logger.main.error('Failed to load renderer:', error);
       });
     }
+  }
+
+  // Disponible aussi hors dev (app packagee) : indispensable pour un
+  // diagnostic reel sur le poste de l'utilisateur, voir RUNBOOK.md.
+  if (process.env.ORCH_DEVTOOLS === '1') {
+    mainWindow.webContents.openDevTools({ mode: 'detach' });
   }
 }
 
