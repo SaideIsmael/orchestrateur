@@ -27,15 +27,18 @@ vi.mock('electron', () => {
       loadFile: vi.fn()
     };
 
+    contentView = {
+      addChildView: vi.fn(),
+      removeChildView: vi.fn()
+    };
+
     constructor() {}
 
-    setBrowserView() {}
-    removeBrowserView() {}
     loadURL() {}
     loadFile() {}
   }
 
-  class BrowserView {
+  class WebContentsView {
     webContents = {
       setUserAgent: vi.fn(),
       setWindowOpenHandler: vi.fn(),
@@ -53,7 +56,6 @@ vi.mock('electron', () => {
     constructor() {}
 
     setBounds() {}
-    setAutoResize() {}
   }
 
   const session = {
@@ -68,7 +70,7 @@ vi.mock('electron', () => {
     app,
     ipcMain,
     BrowserWindow,
-    BrowserView,
+    WebContentsView,
     session
   };
 });

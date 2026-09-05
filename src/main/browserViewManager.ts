@@ -1,4 +1,4 @@
-import { BrowserView, BrowserWindow, session } from 'electron';
+import { WebContentsView, BrowserWindow, session } from 'electron';
 import type { ProviderDefinition } from '../shared/providers';
 import { allowNavigation } from '../shared/allowlist';
 import { logger } from './log';
@@ -23,7 +23,7 @@ const ACCEPT_LANGUAGE = 'fr-FR,fr;q=0.9';
 
 export class BrowserViewManager {
   private window: BrowserWindow;
-  private view: BrowserView | null = null;
+  private view: WebContentsView | null = null;
   private bounds: BrowserBounds = { x: 0, y: 0, width: 800, height: 600 };
   private activeProviderId: string | null = null;
   private allowlist: string[] = [];
@@ -57,11 +57,11 @@ export class BrowserViewManager {
     this.applySessionHeaders(partitionId, providerSession);
 
     if (this.view) {
-      this.window.removeBrowserView(this.view);
+      this.window.contentView.removeChildView(this.view);
       this.view = null;
     }
 
-    this.view = new BrowserView({
+    this.view = new WebContentsView({
       webPreferences: {
         session: providerSession,
         nodeIntegration: false,
@@ -72,9 +72,8 @@ export class BrowserViewManager {
       } as Electron.WebPreferences
     });
 
-    this.window.setBrowserView(this.view);
+    this.window.contentView.addChildView(this.view);
     this.view.setBounds(this.bounds);
-    this.view.setAutoResize({ width: false, height: false });
 
     const userAgent = provider.userAgentOverride || this.fallbackUserAgent;
     this.view.webContents.setUserAgent(userAgent);
