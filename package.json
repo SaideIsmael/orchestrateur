@@ -1,6 +1,8 @@
 {
   "name": "orchestrateur",
   "version": "0.1.0",
+  "description": "Navigateur multi-fournisseurs a isolation de session pour usage judiciaire",
+  "author": "SaideIsmael",
   "private": true,
   "main": "dist/main/main.js",
   "scripts": {
@@ -14,7 +16,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "pack": "electron-builder --dir",
-    "dist": "electron-builder"
+    "dist": "electron-builder",
+    "release": "electron-builder --publish always"
   },
   "dependencies": {
     "electron-log": "^5.4.4",
