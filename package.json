@@ -1,6 +1,6 @@
 {
   "name": "orchestrateur",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Navigateur multi-fournisseurs a isolation de session pour usage judiciaire",
   "author": "SaideIsmael",
   "private": true,
