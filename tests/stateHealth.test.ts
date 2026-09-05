@@ -11,12 +11,17 @@ vi.mock('electron', () => ({
   },
   safeStorage: {
     isEncryptionAvailable: () => true,
-    encryptString: (value: string) => Buffer.from(`encrypted:${value}`)
+    encryptString: (value: string) => Buffer.from(`encrypted:${value}`),
+    decryptString: (buffer: Buffer) => buffer.toString('utf8').replace(/^encrypted:/, '')
   }
 }));
 
 describe('checkStateHealth', () => {
   beforeEach(() => {
+    // Chaque test doit repartir d'un module crypto.ts vierge : sa cle en
+    // cache est un etat de module qui, sans reset, survivrait entre les
+    // tests et masquerait le vrai comportement au demarrage d'un processus.
+    vi.resetModules();
     userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'orchestrateur-health-'));
   });
 
@@ -37,6 +42,26 @@ describe('checkStateHealth', () => {
     const health = checkStateHealth();
 
     expect(health.ok).toBe(true);
+  });
+
+  it('survit a un redemarrage de processus (cle re-chargee depuis disque)', async () => {
+    const { saveState } = await import('../src/main/stateStore');
+    const { defaultState, addOpenedProvider } = await import('../src/shared/state');
+
+    const state = addOpenedProvider({ ...defaultState }, 'chatgpt');
+    saveState(state);
+
+    // Simule un vrai redemarrage : le cache en memoire de la cle
+    // (module-level dans crypto.ts) disparait, seul ce qui est sur disque
+    // (state.enc + state.key) doit permettre de relire l'etat.
+    vi.resetModules();
+    const { loadState, checkStateHealth } = await import('../src/main/stateStore');
+
+    const health = checkStateHealth();
+    const reloaded = loadState();
+
+    expect(health.ok).toBe(true);
+    expect(reloaded.openedProviders).toEqual(['chatgpt']);
   });
 
   it('reports not ok when the state file is corrupted', async () => {

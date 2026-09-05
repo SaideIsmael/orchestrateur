@@ -9,6 +9,7 @@
     "src/main/**/*",
     "src/renderer/**/*",
     "src/shared/**/*",
-    "tests/**/*"
+    "tests/**/*",
+    "tests-e2e/**/*"
   ]
 }

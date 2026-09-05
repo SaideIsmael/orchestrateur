@@ -1,13 +1,27 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
-import { safeStorage } from 'electron';
+import fs from 'node:fs';
+import path from 'node:path';
+import { app, safeStorage } from 'electron';
 
 const ALGORITHM = 'aes-256-gcm';
 const KEY_LENGTH = 32;
 const IV_LENGTH = 12;
 const TAG_LENGTH = 16;
+const KEY_FILE_NAME = 'state.key';
 
 let cachedKey: Buffer | null = null;
 
+const getKeyFilePath = () => path.join(app.getPath('userData'), KEY_FILE_NAME);
+
+/**
+ * Cle d'enveloppe : un secret aleatoire de 32 octets, genere une seule fois,
+ * chiffre par safeStorage puis persiste dans state.key. safeStorage.encryptString
+ * n'est PAS deterministe (nonce aleatoire a chaque appel) : l'utiliser
+ * directement comme source de la cle, sans la persister, produisait une cle
+ * differente a chaque demarrage et rendait state.enc illisible des le
+ * redemarrage suivant (bug reel decouvert via les tests E2E de restauration
+ * d'etat, jamais teste jusque-la sur un vrai cycle fermeture/reouverture).
+ */
 function getEncryptionKey(): Buffer {
   if (cachedKey) {
     return cachedKey;
@@ -17,13 +31,21 @@ function getEncryptionKey(): Buffer {
     throw new Error('safeStorage non disponible sur cette plateforme');
   }
 
-  const encryptedKey = safeStorage.encryptString('orchestrateur-state-key');
-  const keyBuffer = Buffer.from(encryptedKey as unknown as string, 'base64');
+  const keyFilePath = getKeyFilePath();
 
-  cachedKey = keyBuffer.length >= KEY_LENGTH
-    ? keyBuffer.subarray(0, KEY_LENGTH)
-    : Buffer.concat([keyBuffer, randomBytes(KEY_LENGTH - keyBuffer.length)]).subarray(0, KEY_LENGTH);
+  if (fs.existsSync(keyFilePath)) {
+    const storedEncryptedKey = fs.readFileSync(keyFilePath);
+    const decrypted = safeStorage.decryptString(storedEncryptedKey);
+    cachedKey = Buffer.from(decrypted, 'base64');
+    return cachedKey;
+  }
 
+  const newKey = randomBytes(KEY_LENGTH);
+  const encryptedKey = safeStorage.encryptString(newKey.toString('base64'));
+  fs.mkdirSync(path.dirname(keyFilePath), { recursive: true });
+  fs.writeFileSync(keyFilePath, encryptedKey);
+
+  cachedKey = newKey;
   return cachedKey;
 }
 

@@ -11,10 +11,11 @@
     "build:main": "tsc -p tsconfig.main.json",
     "build:renderer": "vite build",
     "build": "npm run build:main && npm run build:renderer",
-    "lint": "eslint \"src/main/**/*.{ts,tsx}\" \"src/renderer/**/*.{ts,tsx}\" \"src/shared/**/*.{ts,tsx}\" \"tests/**/*.ts\"",
+    "lint": "eslint \"src/main/**/*.{ts,tsx}\" \"src/renderer/**/*.{ts,tsx}\" \"src/shared/**/*.{ts,tsx}\" \"tests/**/*.ts\" \"tests-e2e/**/*.ts\"",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "npm run build && playwright test -c tests-e2e/playwright.config.ts",
     "pack": "electron-builder --dir",
     "dist": "electron-builder",
     "release": "electron-builder --publish always"
@@ -27,6 +28,7 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@types/node": "^22.10.1",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",

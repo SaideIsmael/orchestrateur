@@ -11,6 +11,12 @@ const getExternalConfigPath = () => {
 };
 
 export const getProvidersConfigPath = () => {
+  // Point d'isolation pour les tests de bout en bout (Playwright) : permet
+  // de pointer vers une config de test sans toucher a config/providers.json.
+  if (process.env.ORCH_PROVIDERS_CONFIG_PATH) {
+    return process.env.ORCH_PROVIDERS_CONFIG_PATH;
+  }
+
   const externalPath = getExternalConfigPath();
   if (fs.existsSync(externalPath)) {
     return externalPath;

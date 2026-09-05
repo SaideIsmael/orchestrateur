@@ -24,6 +24,8 @@
 !src/shared/**
 !tests/
 !tests/**
+!tests-e2e/
+!tests-e2e/**
 !scripts/
 !scripts/**
 !config/
