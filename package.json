@@ -61,7 +61,8 @@
       {
         "provider": "github",
         "owner": "SaideIsmael",
-        "repo": "orchestrateur"
+        "repo": "orchestrateur",
+        "draft": false
       }
     ]
   }
