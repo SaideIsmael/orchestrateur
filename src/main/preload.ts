@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 
 contextBridge.exposeInMainWorld('orchestrator', {
   ping: () => ipcRenderer.invoke('app:ping'),
+  getHealth: () => ipcRenderer.invoke('app:health'),
   getProviders: () => ipcRenderer.invoke('providers:list'),
   getOpenedProviders: () => ipcRenderer.invoke('providers:opened'),
   openProvider: (providerId: string) =>

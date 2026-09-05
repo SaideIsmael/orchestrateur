@@ -30,3 +30,35 @@ export const saveState = (state: OrchestratorState) => {
   const encrypted = encryptState(state);
   writeStateFileRaw(getStatePath(), encrypted);
 };
+
+export type StateHealth = {
+  ok: boolean;
+  path: string;
+  error?: string;
+};
+
+/**
+ * Verifie a la demande si l'etat persiste peut reellement etre lu et
+ * dechiffre, sans modifier quoi que ce soit. Contrairement a loadState()
+ * qui retombe silencieusement sur l'etat par defaut en cas d'echec,
+ * cette fonction rend l'echec visible pour le canal de sante IPC.
+ */
+export const checkStateHealth = (): StateHealth => {
+  const filePath = getStatePath();
+  const raw = readStateFileRaw(filePath);
+
+  if (!raw) {
+    return { ok: true, path: filePath };
+  }
+
+  const decrypted = decryptState(raw);
+  if (!decrypted) {
+    return {
+      ok: false,
+      path: filePath,
+      error: 'Dechiffrement du fichier d\'etat impossible (safeStorage indisponible ou fichier corrompu).'
+    };
+  }
+
+  return { ok: true, path: filePath };
+};

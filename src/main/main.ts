@@ -125,7 +125,7 @@ function renderConfigErrorHtml(errors: string[], configPath: string) {
 }
 
 app.whenReady().then(() => {
-  registerAppIpc();
+  registerAppIpc(() => viewManager);
 
   const mainWindow = createMainWindow();
   const providersResult = loadProvidersConfig();

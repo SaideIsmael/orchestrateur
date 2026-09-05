@@ -1,9 +1,12 @@
+import type { AppHealth } from '../shared/types';
+
 export {};
 
 declare global {
   interface Window {
     orchestrator: {
       ping: () => Promise<string>;
+      getHealth: () => Promise<AppHealth | { ok: false; error: string }>;
       getProviders: () => Promise<
         { id: string; name: string; url_home: string }[]
       >;
