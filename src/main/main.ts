@@ -4,6 +4,7 @@ import { autoUpdater } from 'electron-updater';
 import { BrowserViewManager } from './browserViewManager';
 import { getProvidersConfigPath, loadProvidersConfig } from './providersStore';
 import { loadState, saveState } from './stateStore';
+import { createDailyBackupIfNeeded } from './backupStore';
 import type { ProviderDefinition } from '../shared/providers';
 import type { OrchestratorState } from '../shared/state';
 import { defaultState } from '../shared/state';
@@ -130,6 +131,15 @@ app.whenReady().then(() => {
   const mainWindow = createMainWindow();
   const providersResult = loadProvidersConfig();
   orchestratorState = loadState();
+
+  try {
+    const backup = createDailyBackupIfNeeded();
+    if (backup) {
+      logger.main.info('Sauvegarde quotidienne creee:', backup.id);
+    }
+  } catch (error) {
+    logger.main.error('Sauvegarde quotidienne impossible:', error);
+  }
 
   mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDesc, url) => {
     const html = `<!doctype html>

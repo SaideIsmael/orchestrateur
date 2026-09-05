@@ -77,8 +77,33 @@ fichier).
 - En mode permissif, tout est autorise mais un avertissement est affiche.
 
 ## Persistance
-- `state.json` est stocke dans `%APPDATA%\\Orchestrateur\\state.json`.
-- Il contient la liste des providers ouverts + le dernier provider actif.
+- L'etat (liste des providers ouverts + dernier provider actif) est
+  chiffre (AES-256-GCM) dans `state.enc`, sous
+  `%APPDATA%\Orchestrateur\`.
+- La cle de chiffrement est un secret aleatoire genere une seule fois,
+  lui-meme chiffre par `safeStorage` (DPAPI Windows) et persiste dans
+  `state.key`, a cote de `state.enc`. Les deux fichiers sont
+  indispensables ensemble : sans `state.key`, `state.enc` est
+  illisible.
+- Limite structurelle a connaitre : `state.key` n'est dechiffrable que
+  sur le meme compte Windows que celui qui l'a cree (DPAPI n'est pas
+  portable d'un profil ou d'une machine a l'autre). Une copie de
+  sauvegarde restauree sur un autre poste ou apres reinstallation du
+  profil Windows sera illisible, quel que soit son contenu.
+
+## Sauvegardes automatiques
+- Une sauvegarde de `state.enc` + `state.key` est creee automatiquement
+  au demarrage de l'app, au maximum une fois par jour (heure locale),
+  dans `%APPDATA%\Orchestrateur\backups\<horodatage>\`.
+- Les 14 sauvegardes les plus recentes sont conservees, les plus
+  anciennes sont supprimees automatiquement.
+- Restauration manuelle (aucune interface pour l'instant) : fermer
+  l'application, dans le dossier `backups` choisir l'horodatage voulu,
+  copier ses fichiers `state.enc` et `state.key` par-dessus ceux du
+  dossier `%APPDATA%\Orchestrateur\` (pas le sous-dossier `backups`
+  lui-meme), puis relancer l'application.
+- Meme limite que ci-dessus : une sauvegarde ne se restaure que sur le
+  meme compte Windows.
 
 ## Securite Electron
 - Pas de Node dans le contenu distant.

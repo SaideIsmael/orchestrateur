@@ -11,7 +11,7 @@ const KEY_FILE_NAME = 'state.key';
 
 let cachedKey: Buffer | null = null;
 
-const getKeyFilePath = () => path.join(app.getPath('userData'), KEY_FILE_NAME);
+export const getKeyFilePath = () => path.join(app.getPath('userData'), KEY_FILE_NAME);
 
 /**
  * Cle d'enveloppe : un secret aleatoire de 32 octets, genere une seule fois,
