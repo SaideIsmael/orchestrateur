@@ -58,7 +58,8 @@
       "target": [
         "portable",
         "nsis"
-      ]
+      ],
+      "forceCodeSigning": true
     },
     "publish": [
       {

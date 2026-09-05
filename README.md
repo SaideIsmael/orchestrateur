@@ -63,3 +63,33 @@ Format (tableau JSON) :
 - Pas de Node dans le contenu distant.
 - `contextIsolation` + `sandbox` actifs.
 - Navigation controlee par allowlist.
+
+## Signature de code (obligatoire avant toute distribution)
+`build.win.forceCodeSigning` est active dans `package.json` : `npm run
+release` echoue explicitement tant qu'aucun certificat valide n'est
+configure, plutot que de publier silencieusement un `.exe` non signe
+(ce qui s'est produit pour les versions 0.1.0 et 0.1.1).
+
+Etapes une fois le certificat de signature de code obtenu (OV ou IV,
+avec jeton materiel certifie FIPS - obligatoire depuis 2023, meme pour
+un certificat OV) :
+
+1. Installer le pilote du fournisseur du jeton et brancher le jeton.
+   Le certificat s'installe alors automatiquement dans le magasin
+   Windows (`Cert:\CurrentUser\My` ou `Cert:\LocalMachine\My`).
+2. Retrouver son empreinte SHA1 :
+   ```powershell
+   Get-ChildItem Cert:\CurrentUser\My | Format-List Subject,Thumbprint
+   ```
+3. Ajouter dans `package.json`, sous `build.win` :
+   ```json
+   "certificateSha1": "EMPREINTE_SHA1_ICI"
+   ```
+4. Relancer `npm run release`. Le jeton materiel demande generalement
+   la saisie d'un code PIN au moment de la signature (invite Windows,
+   pas dans le terminal).
+
+Ne jamais commiter de fichier `.pfx` ni de mot de passe de certificat
+dans ce depot : un certificat sur jeton materiel n'est de toute facon
+pas exportable en `.pfx`, c'est precisement l'interet de ce type de
+support.
