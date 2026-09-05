@@ -36,7 +36,7 @@ describe('mergeCsp', () => {
     expect(merged).toContain('upgrade-insecure-requests');
   });
 
-  it("supprime 'none' d'une directive si l'autre côté ajoute une vraie source", () => {
+  it("un fournisseur ne peut pas desserrer un 'none' fixe par l'application", () => {
     const providerPolicy = "frame-src https://widget.fournisseur.example";
 
     const merged = mergeCsp(providerPolicy, APP_POLICY);
@@ -46,8 +46,10 @@ describe('mergeCsp', () => {
       .map((part) => part.trim())
       .find((part) => part.startsWith('frame-src'));
 
-    expect(frameSrc).toBe('frame-src https://widget.fournisseur.example');
-    expect(frameSrc).not.toContain("'none'");
+    // frame-src 'none' est un verrou volontaire de l'application (voir
+    // browserViewManager.ts) : un fournisseur ne doit jamais pouvoir
+    // l'annuler en declarant sa propre valeur pour cette directive.
+    expect(frameSrc).toBe("frame-src 'none'");
   });
 
   it("garde 'none' quand aucune source réelle ne s'y oppose", () => {
@@ -61,5 +63,19 @@ describe('mergeCsp', () => {
       .find((part) => part.startsWith('object-src'));
 
     expect(objectSrc).toBe("object-src 'none'");
+  });
+
+  it("un fournisseur peut toujours etendre une directive qui n'est pas un verrou strict", () => {
+    const providerPolicy = "img-src https://cdn.fournisseur.example";
+
+    const merged = mergeCsp(providerPolicy, APP_POLICY);
+
+    const imgSrc = merged
+      .split(';')
+      .map((part) => part.trim())
+      .find((part) => part.startsWith('img-src'));
+
+    expect(imgSrc).toContain('https://cdn.fournisseur.example');
+    expect(imgSrc).toContain("'self'");
   });
 });

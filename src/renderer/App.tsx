@@ -9,6 +9,15 @@ type NavState = {
   providerId: string | null;
 };
 
+function isIpcError(value: unknown): value is { ok: false; error: string } {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'ok' in value &&
+    (value as { ok: unknown }).ok === false
+  );
+}
+
 export default function App() {
   const bridgeAvailable = Boolean(window.orchestrator);
   const [providers, setProviders] = useState<ProviderSummary[]>([]);
@@ -53,19 +62,21 @@ export default function App() {
 
     let mounted = true;
     window.orchestrator.getProviders().then((list) => {
-      if (mounted) {
+      if (mounted && !isIpcError(list)) {
         setProviders(list);
       }
     });
 
     window.orchestrator.getNavState().then((state) => {
-      if (state) {
+      if (state && !isIpcError(state)) {
         setNavState(state);
       }
     });
 
     window.orchestrator.getOpenedProviders().then((items) => {
-      setOpenedProviders(items);
+      if (!isIpcError(items)) {
+        setOpenedProviders(items);
+      }
     });
 
     window.orchestrator.getPermissiveMode().then((value) => {

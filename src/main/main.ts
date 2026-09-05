@@ -71,14 +71,31 @@ function loadRenderer(mainWindow: BrowserWindow) {
   }
 }
 
+function runDailyBackupCheck() {
+  try {
+    const backup = createDailyBackupIfNeeded();
+    if (backup) {
+      logger.main.info('Sauvegarde quotidienne creee:', backup.id);
+    }
+  } catch (error) {
+    logger.main.error('Sauvegarde quotidienne impossible:', error);
+  }
+}
+
+function notifyRenderer(
+  mainWindow: BrowserWindow,
+  message: string,
+  level: 'info' | 'warning' = 'info'
+) {
+  mainWindow.webContents.send('ui:notification', { level, message });
+}
+
 function setupAutoUpdater(mainWindow: BrowserWindow) {
   if (!app.isPackaged) {
     return;
   }
 
-  const notify = (message: string) => {
-    mainWindow.webContents.send('ui:notification', { level: 'info', message });
-  };
+  const notify = (message: string) => notifyRenderer(mainWindow, message);
 
   autoUpdater.logger = logger.main;
 
@@ -101,14 +118,13 @@ function setupAutoUpdater(mainWindow: BrowserWindow) {
   });
 }
 
-function renderConfigErrorHtml(errors: string[], configPath: string) {
-  const errorItems = errors.map((error) => `<li>${error}</li>`).join('');
+function renderErrorPage(title: string, bodyHtml: string) {
   return `<!doctype html>
 <html lang="fr">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Configuration invalide</title>
+    <title>${title}</title>
     <style>
       body { font-family: "Segoe UI", sans-serif; background: #0f172a; color: #e2e8f0; padding: 32px; }
       .card { max-width: 720px; background: #1e293b; border-radius: 16px; padding: 24px; }
@@ -119,13 +135,44 @@ function renderConfigErrorHtml(errors: string[], configPath: string) {
   </head>
   <body>
     <div class="card">
-      <h1>Configuration providers.json invalide</h1>
-      <p>Corrigez le fichier suivant puis relancez l'application :</p>
-      <p><code>${configPath}</code></p>
-      <ul>${errorItems}</ul>
+      ${bodyHtml}
     </div>
   </body>
 </html>`;
+}
+
+function loadErrorPage(window: BrowserWindow, html: string) {
+  window
+    .loadURL(`data:text/html;charset=UTF-8,${encodeURIComponent(html)}`)
+    .catch((error) => {
+      logger.main.error('Failed to load error page:', error);
+    });
+}
+
+function renderConfigErrorHtml(errors: string[], configPath: string) {
+  const errorItems = errors.map((error) => `<li>${error}</li>`).join('');
+  return renderErrorPage(
+    'Configuration invalide',
+    `<h1>Configuration providers.json invalide</h1>
+     <p>Corrigez le fichier suivant puis relancez l'application :</p>
+     <p><code>${configPath}</code></p>
+     <ul>${errorItems}</ul>`
+  );
+}
+
+/**
+ * Affiche l'ecran de configuration invalide si configErrors est renseigne,
+ * sinon initialise normalement la fenetre. Partagee entre le tout premier
+ * lancement (app.whenReady) et toute reactivation (app.on('activate')) pour
+ * ne pas dupliquer cette decision a deux endroits.
+ */
+function showConfigErrorOrInit(window: BrowserWindow, onReady: () => void) {
+  if (configErrors) {
+    loadErrorPage(window, renderConfigErrorHtml(configErrors, getProvidersConfigPath()));
+    return;
+  }
+
+  onReady();
 }
 
 app.whenReady().then(() => {
@@ -135,54 +182,30 @@ app.whenReady().then(() => {
   const providersResult = loadProvidersConfig();
   orchestratorState = loadState();
 
-  try {
-    const backup = createDailyBackupIfNeeded();
-    if (backup) {
-      logger.main.info('Sauvegarde quotidienne creee:', backup.id);
-    }
-  } catch (error) {
-    logger.main.error('Sauvegarde quotidienne impossible:', error);
-  }
+  runDailyBackupCheck();
+  // Un seul appel au demarrage ne suffit pas sur un poste laisse ouvert
+  // en continu : sans ce rappel, aucune sauvegarde n'est jamais prise
+  // apres un changement de jour tant que l'app n'est pas redemarree.
+  setInterval(runDailyBackupCheck, 60 * 60 * 1000);
 
   mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDesc, url) => {
-    const html = `<!doctype html>
-<html lang="fr">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Chargement impossible</title>
-    <style>
-      body { font-family: "Segoe UI", sans-serif; background: #0f172a; color: #e2e8f0; padding: 32px; }
-      .card { max-width: 720px; background: #1e293b; border-radius: 16px; padding: 24px; }
-      h1 { margin-top: 0; font-size: 22px; }
-      code { background: #0f172a; padding: 2px 6px; border-radius: 6px; }
-    </style>
-  </head>
-  <body>
-    <div class="card">
-      <h1>Impossible de charger l'interface</h1>
-      <p>Erreur: <strong>${errorDesc}</strong> (code ${errorCode}).</p>
-      <p>URL: <code>${url}</code></p>
-      <p>Si vous etes en dev, assurez-vous que Vite tourne sur ${DEV_SERVER_URL ?? 'http://localhost:5173'}.</p>
-    </div>
-  </body>
-</html>`;
-    mainWindow.loadURL(`data:text/html;charset=UTF-8,${encodeURIComponent(html)}`);
+    const html = renderErrorPage(
+      'Chargement impossible',
+      `<h1>Impossible de charger l'interface</h1>
+       <p>Erreur: <strong>${errorDesc}</strong> (code ${errorCode}).</p>
+       <p>URL: <code>${url}</code></p>
+       <p>Si vous etes en dev, assurez-vous que Vite tourne sur ${DEV_SERVER_URL ?? 'http://localhost:5173'}.</p>`
+    );
+    loadErrorPage(mainWindow, html);
   });
 
+  configErrors = providersResult.ok ? null : providersResult.errors;
+
   if (!providersResult.ok) {
-    configErrors = providersResult.errors;
-    const html = renderConfigErrorHtml(
-      providersResult.errors,
-      getProvidersConfigPath()
-    );
-    mainWindow.loadURL(
-      `data:text/html;charset=UTF-8,${encodeURIComponent(html)}`
-    );
+    loadErrorPage(mainWindow, renderConfigErrorHtml(providersResult.errors, getProvidersConfigPath()));
     return;
   }
 
-  configErrors = null;
   providersCache = providersResult.providers;
   viewManager = new BrowserViewManager(mainWindow, FALLBACK_USER_AGENT);
 
@@ -206,7 +229,8 @@ app.whenReady().then(() => {
     getOrchestratorState,
     setOrchestratorState,
     saveState,
-    broadcastOpenedProviders
+    broadcastOpenedProviders,
+    (message) => notifyRenderer(mainWindow, message, 'warning')
   );
 
   registerNavigationIpc(getViewManager);
@@ -223,20 +247,10 @@ app.whenReady().then(() => {
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       const nextWindow = createMainWindow();
-      if (configErrors) {
-        const html = renderConfigErrorHtml(
-          configErrors,
-          getProvidersConfigPath()
-        );
-        nextWindow.loadURL(
-          `data:text/html;charset=UTF-8,${encodeURIComponent(html)}`
-        ).catch((error) => {
-          logger.main.error('Failed to load config error page:', error);
-        });
-      } else {
+      showConfigErrorOrInit(nextWindow, () => {
         viewManager = new BrowserViewManager(nextWindow, FALLBACK_USER_AGENT);
         loadRenderer(nextWindow);
-      }
+      });
     }
   });
 });

@@ -14,6 +14,17 @@ let cachedKey: Buffer | null = null;
 export const getKeyFilePath = () => path.join(app.getPath('userData'), KEY_FILE_NAME);
 
 /**
+ * Invalide la cle en cache memoire. A appeler apres toute operation qui
+ * remplace state.key sur disque en dehors du chemin normal d'ecriture
+ * (restauration d'une sauvegarde) : sans cet appel, le processus continue
+ * de dechiffrer/chiffrer avec l'ancienne cle, qui ne correspond plus au
+ * fichier restaure.
+ */
+export function invalidateCachedKey(): void {
+  cachedKey = null;
+}
+
+/**
  * Cle d'enveloppe : un secret aleatoire de 32 octets, genere une seule fois,
  * chiffre par safeStorage puis persiste dans state.key. safeStorage.encryptString
  * n'est PAS deterministe (nonce aleatoire a chaque appel) : l'utiliser
@@ -67,7 +78,7 @@ export function encryptState(state: object): string {
   return combined.toString('base64');
 }
 
-export function decryptState(encrypted: string): object | null {
+function decryptWithKey(encrypted: string, key: Buffer): object | null {
   try {
     const combined = Buffer.from(encrypted, 'base64');
 
@@ -78,8 +89,6 @@ export function decryptState(encrypted: string): object | null {
     const iv = combined.subarray(0, IV_LENGTH);
     const authTag = combined.subarray(combined.length - TAG_LENGTH);
     const ciphertext = combined.subarray(IV_LENGTH, combined.length - TAG_LENGTH);
-
-    const key = getEncryptionKey();
 
     const decipher = createDecipheriv(ALGORITHM, key, iv);
     decipher.setAuthTag(authTag);
@@ -92,5 +101,35 @@ export function decryptState(encrypted: string): object | null {
     return JSON.parse(plaintext.toString('utf8'));
   } catch {
     return null;
+  }
+}
+
+export function decryptState(encrypted: string): object | null {
+  try {
+    return decryptWithKey(encrypted, getEncryptionKey());
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Verifie qu'un contenu chiffre et un fichier de cle donnes forment bien
+ * une paire valide, sans toucher a la cle en cache ni au fichier de cle en
+ * cours d'utilisation. Sert a valider une sauvegarde avant de l'appliquer
+ * (voir backupStore.ts, restoreBackup) plutot que d'ecraser les fichiers
+ * vivants a l'aveugle.
+ */
+export function canDecryptWithKeyFile(encrypted: string, keyFilePath: string): boolean {
+  if (!safeStorage.isEncryptionAvailable() || !fs.existsSync(keyFilePath)) {
+    return false;
+  }
+
+  try {
+    const storedEncryptedKey = fs.readFileSync(keyFilePath);
+    const decryptedKey = safeStorage.decryptString(storedEncryptedKey);
+    const key = Buffer.from(decryptedKey, 'base64');
+    return decryptWithKey(encrypted, key) !== null;
+  } catch {
+    return false;
   }
 }

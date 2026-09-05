@@ -2,13 +2,26 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { app } from 'electron';
 import { getStatePath } from './stateStore';
-import { getKeyFilePath } from './crypto';
+import { getKeyFilePath, canDecryptWithKeyFile, invalidateCachedKey } from './crypto';
 
 const BACKUPS_DIR_NAME = 'backups';
 const MANIFEST_FILE_NAME = 'manifest.json';
 const DEFAULT_MAX_BACKUPS = 14;
 
 export const getBackupsDir = () => path.join(app.getPath('userData'), BACKUPS_DIR_NAME);
+
+/**
+ * Date locale (annee-mois-jour), pas UTC. Date.prototype.toISOString()
+ * renvoie toujours l'heure UTC : comparer des prefixes de chaines ISO pour
+ * decider "meme jour" desynchronise la cadence quotidienne de l'heure
+ * locale reelle de l'utilisateur des qu'il n'est pas a UTC+0.
+ */
+function localDateStamp(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
 export type BackupInfo = {
   id: string;
@@ -77,6 +90,14 @@ export function listBackups(): BackupInfo[] {
  * cle elle-meme est chiffree par safeStorage (DPAPI, liee au compte
  * Windows) : une sauvegarde copiee sur un autre poste ou apres une
  * reinstallation du profil sera illisible, quel que soit son contenu.
+ *
+ * Avant d'ecraser quoi que ce soit : verifie que la paire state.enc/state.key
+ * de la sauvegarde se dechiffre reellement (une sauvegarde partiellement
+ * ecrite ou modifiee a la main ne sera pas appliquee), puis met de cote
+ * l'etat actuellement en place pour que la restauration reste elle-meme
+ * reversible. Invalide ensuite la cle en cache : sans cela, le processus
+ * en cours continuerait de (de)chiffrer avec l'ancienne cle, qui ne
+ * correspond plus au fichier restaure.
  */
 export function restoreBackup(id: string): boolean {
   const backupDir = path.join(getBackupsDir(), id);
@@ -87,8 +108,17 @@ export function restoreBackup(id: string): boolean {
     return false;
   }
 
+  const backedUpContent = fs.readFileSync(backedUpState, 'utf8').trim();
+  if (!canDecryptWithKeyFile(backedUpContent, backedUpKey)) {
+    return false;
+  }
+
+  createBackup();
+
   fs.copyFileSync(backedUpState, getStatePath());
   fs.copyFileSync(backedUpKey, getKeyFilePath());
+  invalidateCachedKey();
+
   return true;
 }
 
@@ -100,15 +130,18 @@ export function pruneOldBackups(keep: number = DEFAULT_MAX_BACKUPS): void {
 }
 
 /**
- * A appeler une fois au demarrage de l'app. Cree une sauvegarde
- * uniquement si aucune n'existe deja pour la date du jour (heure locale),
- * pour obtenir une cadence quotidienne sans minuteur en arriere-plan :
- * l'application n'est pas forcement lancee en continu.
+ * A appeler au demarrage de l'app, puis periodiquement pendant qu'elle
+ * tourne (voir main.ts). Cree une sauvegarde uniquement si aucune n'existe
+ * deja pour la date du jour en heure locale. Un appel unique au demarrage
+ * ne suffit pas a garantir une cadence quotidienne sur un poste laisse
+ * ouvert en continu (le cas d'un poste de travail garde allume toute la
+ * journee) : sans rappel periodique, aucune sauvegarde n'est jamais prise
+ * apres le changement de jour tant que l'app n'est pas redemarree.
  */
 export function createDailyBackupIfNeeded(): BackupInfo | null {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateStamp(new Date());
   const alreadyDoneToday = listBackups().some(
-    (backup) => backup.createdAt.slice(0, 10) === today
+    (backup) => localDateStamp(new Date(backup.createdAt)) === today
   );
 
   if (alreadyDoneToday) {

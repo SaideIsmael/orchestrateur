@@ -47,7 +47,12 @@ export const checkStateHealth = (): StateHealth => {
   const filePath = getStatePath();
   const raw = readStateFileRaw(filePath);
 
-  if (!raw) {
+  // null = aucun fichier (premiere execution, cas sain). Une chaine vide
+  // signifie que le fichier existe mais est vide/tronque (ecriture non
+  // atomique interrompue) : ce n'est PAS le meme cas, il doit tomber dans
+  // la verification de dechiffrement ci-dessous plutot que d'etre traite
+  // comme "pas encore d'etat".
+  if (raw === null) {
     return { ok: true, path: filePath };
   }
 

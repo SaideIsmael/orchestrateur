@@ -76,4 +76,17 @@ describe('checkStateHealth', () => {
     expect(health.ok).toBe(false);
     expect(health.error).toBeTruthy();
   });
+
+  it('reports not ok when the state file exists but is empty (ecriture tronquee)', async () => {
+    const { checkStateHealth, getStatePath } = await import('../src/main/stateStore');
+
+    const filePath = getStatePath();
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, '', 'utf8');
+
+    const health = checkStateHealth();
+
+    expect(health.ok).toBe(false);
+    expect(health.error).toBeTruthy();
+  });
 });
