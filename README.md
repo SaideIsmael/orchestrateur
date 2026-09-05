@@ -23,6 +23,18 @@ npm run typecheck
 npm test
 ```
 
+## Tests de bout en bout (Playwright)
+```
+npm run test:e2e
+```
+Lance un vrai build de production puis 4 scenarios (`tests-e2e/`)
+contre l'application reelle (Playwright + `_electron`), sans toucher
+a Internet ni a `config/providers.json` : navigation valide, blocage
+hors liste blanche, restauration d'etat apres redemarrage, navigation
+au clavier seul. Aucun raccourci clavier personnalise n'existe dans
+l'app - le scenario clavier verifie l'operabilite native des boutons
+HTML (Tab + Entree), pas un systeme de raccourcis a construire.
+
 ## Build Windows
 ```
 npm run build
