@@ -1,6 +1,8 @@
 import { BrowserView, BrowserWindow, session } from 'electron';
 import type { ProviderDefinition } from '../shared/providers';
 import { allowNavigation } from '../shared/allowlist';
+import { logger } from './log';
+import { mergeCsp } from './csp';
 
 export type BrowserBounds = {
   x: number;
@@ -66,8 +68,7 @@ export class BrowserViewManager {
         contextIsolation: true,
         sandbox: true,
         webviewTag: false,
-        safeDialogs: true,
-        enableRemoteModule: false
+        safeDialogs: true
       } as Electron.WebPreferences
     });
 
@@ -83,14 +84,20 @@ export class BrowserViewManager {
         return { action: 'deny' };
       }
 
-      this.view?.webContents.loadURL(url);
+      this.view?.webContents.loadURL(url).catch((error) => {
+        logger.browserView.error('loadURL failed in setWindowOpenHandler:', error);
+        this.notify(`Erreur de navigation : ${error.message}`);
+      });
       return { action: 'deny' };
     });
 
     this.activeProviderId = provider.id;
     this.allowlist = [...provider.allowlist];
     this.attachNavigationEvents();
-    this.view.webContents.loadURL(provider.url_home);
+    this.view.webContents.loadURL(provider.url_home).catch((error) => {
+      logger.browserView.error('loadURL failed for provider:', error);
+      this.notify(`Impossible de charger le fournisseur : ${error.message}`);
+    });
 
     this.emitNavState();
   }
@@ -193,6 +200,34 @@ export class BrowserViewManager {
         'Accept-Language': ACCEPT_LANGUAGE
       };
       callback({ requestHeaders: headers });
+    });
+
+    const csp = [
+      "default-src 'self'",
+      "script-src 'self'",
+      "style-src 'self'",
+      "img-src 'self' data:",
+      "font-src 'self'",
+      "connect-src 'self'",
+      "frame-src 'none'",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "form-action 'self'"
+    ].join('; ');
+
+    providerSession.webRequest.onHeadersReceived((details, callback) => {
+      const headers = { ...(details.responseHeaders || {}) };
+
+      const existingKey = Object.keys(headers).find(
+        (key) => key.toLowerCase() === 'content-security-policy'
+      );
+      const existingValue = existingKey ? headers[existingKey][0] : undefined;
+      if (existingKey) {
+        delete headers[existingKey];
+      }
+
+      headers['Content-Security-Policy'] = [mergeCsp(existingValue, csp)];
+      callback({ responseHeaders: headers });
     });
 
     this.configuredSessions.add(partitionId);
