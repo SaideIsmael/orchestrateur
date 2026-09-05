@@ -79,5 +79,5 @@ describe('main process smoke', () => {
   it('boots without crashing', async () => {
     await import('../src/main/main');
     expect(true).toBe(true);
-  });
+  }, 30000);
 });

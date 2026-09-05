@@ -1,5 +1,6 @@
 import { app, BrowserWindow } from 'electron';
 import path from 'node:path';
+import { autoUpdater } from 'electron-updater';
 import { BrowserViewManager } from './browserViewManager';
 import { getProvidersConfigPath, loadProvidersConfig } from './providersStore';
 import { loadState, saveState } from './stateStore';
@@ -64,6 +65,36 @@ function loadRenderer(mainWindow: BrowserWindow) {
       });
     }
   }
+}
+
+function setupAutoUpdater(mainWindow: BrowserWindow) {
+  if (!app.isPackaged) {
+    return;
+  }
+
+  const notify = (message: string) => {
+    mainWindow.webContents.send('ui:notification', { level: 'info', message });
+  };
+
+  autoUpdater.logger = logger.main;
+
+  autoUpdater.on('update-available', (info) => {
+    logger.main.info('Mise a jour disponible:', info.version);
+    notify(`Mise a jour disponible (${info.version}), telechargement en cours...`);
+  });
+
+  autoUpdater.on('update-downloaded', (info) => {
+    logger.main.info('Mise a jour telechargee:', info.version);
+    notify(`Mise a jour ${info.version} prete. Elle sera installee au prochain redemarrage.`);
+  });
+
+  autoUpdater.on('error', (error) => {
+    logger.main.error('Erreur de mise a jour automatique:', error);
+  });
+
+  autoUpdater.checkForUpdatesAndNotify().catch((error) => {
+    logger.main.error('Verification de mise a jour impossible:', error);
+  });
 }
 
 function renderConfigErrorHtml(errors: string[], configPath: string) {
@@ -170,6 +201,7 @@ app.whenReady().then(() => {
   registerViewIpc(getViewManager);
 
   loadRenderer(mainWindow);
+  setupAutoUpdater(mainWindow);
 
   mainWindow.webContents.on('did-finish-load', () => {
     broadcastOpenedProviders();
