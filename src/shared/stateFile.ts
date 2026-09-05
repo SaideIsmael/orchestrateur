@@ -1,17 +1,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { defaultState, OrchestratorState, sanitizeState } from './state';
 
-export const readStateFile = (filePath: string): OrchestratorState => {
+export const readStateFileRaw = (filePath: string): string | null => {
   try {
-    const raw = fs.readFileSync(filePath, 'utf8');
-    return sanitizeState(JSON.parse(raw));
+    return fs.readFileSync(filePath, 'utf8').trim();
   } catch {
-    return { ...defaultState };
+    return null;
   }
 };
 
-export const writeStateFile = (filePath: string, state: OrchestratorState) => {
+export const writeStateFileRaw = (filePath: string, content: string) => {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, JSON.stringify(state, null, 2), 'utf8');
+  fs.writeFileSync(filePath, content, 'utf8');
 };

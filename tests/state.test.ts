@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { addOpenedProvider, defaultState, sanitizeState } from '../src/shared/state';
-import { readStateFile, writeStateFile } from '../src/shared/stateFile';
+import { readStateFileRaw, writeStateFileRaw } from '../src/shared/stateFile';
 
 describe('state helpers', () => {
   it('adds opened providers without duplicates', () => {
@@ -21,18 +21,18 @@ describe('state helpers', () => {
     expect(sanitized.lastActiveProviderId).toBeNull();
   });
 
-  it('persists state to disk', () => {
+  it('persists raw state to disk', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'orchestrateur-'));
     const filePath = path.join(dir, 'state.json');
 
-    const state = {
+    const rawContent = JSON.stringify({
       openedProviders: ['chatgpt', 'claude'],
       lastActiveProviderId: 'claude'
-    };
+    });
 
-    writeStateFile(filePath, state);
-    const loaded = readStateFile(filePath);
+    writeStateFileRaw(filePath, rawContent);
+    const loaded = readStateFileRaw(filePath);
 
-    expect(loaded).toEqual(state);
+    expect(loaded).toBe(rawContent);
   });
 });

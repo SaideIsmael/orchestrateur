@@ -1,10 +1,18 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow } from 'electron';
 import path from 'node:path';
 import { BrowserViewManager } from './browserViewManager';
 import { getProvidersConfigPath, loadProvidersConfig } from './providersStore';
 import { loadState, saveState } from './stateStore';
 import type { ProviderDefinition } from '../shared/providers';
-import { addOpenedProvider, defaultState, setLastActiveProvider } from '../shared/state';
+import type { OrchestratorState } from '../shared/state';
+import { defaultState } from '../shared/state';
+
+import { registerAppIpc } from './ipc/app';
+import { registerProvidersIpc } from './ipc/providers';
+import { registerNavigationIpc } from './ipc/navigation';
+import { registerSettingsIpc } from './ipc/settings';
+import { registerViewIpc } from './ipc/view';
+import { logger } from './log';
 
 const DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 const isDev = !app.isPackaged && Boolean(DEV_SERVER_URL);
@@ -14,7 +22,7 @@ const FALLBACK_USER_AGENT =
 let providersCache: ProviderDefinition[] = [];
 let viewManager: BrowserViewManager | null = null;
 let configErrors: string[] | null = null;
-let orchestratorState = { ...defaultState };
+let orchestratorState: OrchestratorState = { ...defaultState };
 
 function createMainWindow() {
   const mainWindow = new BrowserWindow({
@@ -39,12 +47,22 @@ function createMainWindow() {
 
 function loadRenderer(mainWindow: BrowserWindow) {
   if (isDev && DEV_SERVER_URL) {
-    mainWindow.loadURL(DEV_SERVER_URL);
+    const loadResult = mainWindow.loadURL(DEV_SERVER_URL);
+    if (loadResult && typeof loadResult.catch === 'function') {
+      loadResult.catch((error) => {
+        logger.main.error('Failed to load dev server:', error);
+      });
+    }
     if (process.env.ORCH_DEVTOOLS === '1') {
       mainWindow.webContents.openDevTools({ mode: 'detach' });
     }
   } else {
-    mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
+    const loadResult = mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
+    if (loadResult && typeof loadResult.catch === 'function') {
+      loadResult.catch((error) => {
+        logger.main.error('Failed to load renderer:', error);
+      });
+    }
   }
 }
 
@@ -76,7 +94,8 @@ function renderConfigErrorHtml(errors: string[], configPath: string) {
 }
 
 app.whenReady().then(() => {
-  ipcMain.handle('app:ping', () => 'pong');
+  registerAppIpc();
+
   const mainWindow = createMainWindow();
   const providersResult = loadProvidersConfig();
   orchestratorState = loadState();
@@ -133,45 +152,22 @@ app.whenReady().then(() => {
     mainWindow.webContents.send('providers:opened', getOpenedProviders());
   };
 
-  ipcMain.handle('providers:list', () =>
-    providersCache.map(({ id, name, url_home }) => ({
-      id,
-      name,
-      url_home
-    }))
+  const getViewManager = () => viewManager;
+  const getOrchestratorState = () => orchestratorState;
+  const setOrchestratorState = (state: OrchestratorState) => { orchestratorState = state; };
+
+  registerProvidersIpc(
+    () => providersCache,
+    getViewManager,
+    getOrchestratorState,
+    setOrchestratorState,
+    saveState,
+    broadcastOpenedProviders
   );
 
-  ipcMain.handle('providers:opened', () => getOpenedProviders());
-
-  ipcMain.handle('provider:open', (_event, providerId: string) => {
-    const provider = providersCache.find((item) => item.id === providerId);
-    if (!provider || !viewManager) {
-      return { ok: false, error: 'Provider introuvable.' } as const;
-    }
-
-    viewManager.openProvider(provider);
-    orchestratorState = addOpenedProvider(orchestratorState, provider.id);
-    orchestratorState = setLastActiveProvider(orchestratorState, provider.id);
-    saveState(orchestratorState);
-    broadcastOpenedProviders();
-    return { ok: true } as const;
-  });
-
-  ipcMain.on('view:setBounds', (_event, bounds) => {
-    viewManager?.setBounds(bounds);
-  });
-
-  ipcMain.handle('nav:back', () => viewManager?.navigateBack());
-  ipcMain.handle('nav:forward', () => viewManager?.navigateForward());
-  ipcMain.handle('nav:reload', () => viewManager?.reload());
-  ipcMain.handle('nav:state', () => viewManager?.getNavState());
-  ipcMain.handle('settings:getPermissive', () =>
-    viewManager?.getPermissiveMode()
-  );
-  ipcMain.handle('settings:setPermissive', (_event, enabled: boolean) => {
-    viewManager?.setPermissiveMode(Boolean(enabled));
-    return viewManager?.getPermissiveMode();
-  });
+  registerNavigationIpc(getViewManager);
+  registerSettingsIpc(getViewManager);
+  registerViewIpc(getViewManager);
 
   loadRenderer(mainWindow);
 
@@ -189,7 +185,9 @@ app.whenReady().then(() => {
         );
         nextWindow.loadURL(
           `data:text/html;charset=UTF-8,${encodeURIComponent(html)}`
-        );
+        ).catch((error) => {
+          logger.main.error('Failed to load config error page:', error);
+        });
       } else {
         viewManager = new BrowserViewManager(nextWindow, FALLBACK_USER_AGENT);
         loadRenderer(nextWindow);
