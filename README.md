@@ -49,6 +49,15 @@ Format (tableau JSON) :
 ]
 ```
 
+Ce fichier reste volontairement en clair, contrairement a `state.enc`
+(voir Persistance ci-dessus). Il ne contient que des URL publiques de
+fournisseurs IA et leurs listes de domaines autorises, aucune donnee
+confidentielle - le chiffrer ferait perdre la possibilite de l'editer
+directement a la main, sans benefice de securite reel en echange
+(decision prise le 5 septembre 2026, ne pas la reproposer sans
+element nouveau justifiant un changement de contenu sensible dans ce
+fichier).
+
 ## Regle de liste blanche (allowlist)
 - Les domaines autorises sont compares au hostname.
 - Les sous-domaines sont acceptes automatiquement (ex: `sub.example.com` si `example.com` est present).
