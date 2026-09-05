@@ -45,6 +45,9 @@
   "build": {
     "appId": "com.orchestrateur.app",
     "productName": "Orchestrateur",
+    "directories": {
+      "output": "release"
+    },
     "files": [
       "dist/**/*",
       "config/**/*",
@@ -62,7 +65,7 @@
         "provider": "github",
         "owner": "SaideIsmael",
         "repo": "orchestrateur",
-        "draft": false
+        "releaseType": "release"
       }
     ]
   }
