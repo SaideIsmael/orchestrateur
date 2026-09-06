@@ -39,7 +39,7 @@
     "electron-builder": "^26.1.0",
     "eslint": "^9.16.0",
     "eslint-plugin-react": "^7.37.2",
-    "eslint-plugin-react-hooks": "^5.1.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
     "typescript": "^5.7.2",
     "vite": "^8.2.2",
     "vitest": "^4.0.18"
