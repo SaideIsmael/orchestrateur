@@ -17,6 +17,8 @@
 !THREAT_MODEL.md
 
 # Project directories
+!.github/
+!.github/**
 !src/
 !src/main/
 !src/main/**
