@@ -30,7 +30,9 @@ export default function App() {
   });
   const [permissiveMode, setPermissiveMode] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [bridgeError, setBridgeError] = useState<string | null>(null);
+  const [bridgeError, setBridgeError] = useState<string | null>(() =>
+    bridgeAvailable ? null : "Le preload n'a pas ete charge. Verifiez la compilation du main."
+  );
   const [notifications, setNotifications] = useState<
     { id: number; message: string; level: 'warning' | 'info' }[]
   >([]);
@@ -54,9 +56,19 @@ export default function App() {
     []
   );
 
+  const applyNavState = useCallback((state: NavState) => {
+    setNavState(state);
+    // Resynchronise la selection du menu deroulant sur le fournisseur
+    // reellement actif, quelle que soit l'origine du changement de
+    // navigation (bouton de la barre du haut, restauration au demarrage,
+    // navigation interne d'un fournisseur deja ouvert).
+    if (state.providerId) {
+      setSelectedOpenedProvider(state.providerId);
+    }
+  }, []);
+
   useEffect(() => {
     if (!bridgeAvailable) {
-      setBridgeError("Le preload n'a pas ete charge. Verifiez la compilation du main.");
       return;
     }
 
@@ -69,7 +81,7 @@ export default function App() {
 
     window.orchestrator.getNavState().then((state) => {
       if (state && !isIpcError(state)) {
-        setNavState(state);
+        applyNavState(state);
       }
     });
 
@@ -85,9 +97,7 @@ export default function App() {
       }
     });
 
-    const unsubscribe = window.orchestrator.onNavState((state) => {
-      setNavState(state);
-    });
+    const unsubscribe = window.orchestrator.onNavState(applyNavState);
 
     const unsubscribeOpenedProviders = window.orchestrator.onOpenedProviders(
       (items) => {
@@ -107,13 +117,7 @@ export default function App() {
       unsubscribeOpenedProviders();
       unsubscribeNotifications();
     };
-  }, [bridgeAvailable, pushNotification]);
-
-  useEffect(() => {
-    if (navState.providerId) {
-      setSelectedOpenedProvider(navState.providerId);
-    }
-  }, [navState.providerId]);
+  }, [bridgeAvailable, pushNotification, applyNavState]);
 
   useEffect(() => {
     if (!bridgeAvailable || !browserRef.current) {
